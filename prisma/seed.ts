@@ -1,3 +1,6 @@
+//used to automatically fill an empty database with sample data 
+//building/testing your app
+
 import argon2 from "argon2";
 import { prisma } from "../src/lib/prisma.js";
 import { Role, PropertyType } from "../src/generated/enums.js";
