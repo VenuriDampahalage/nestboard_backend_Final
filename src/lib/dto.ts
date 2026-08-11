@@ -16,6 +16,7 @@ export type PropertyDTO = {
   image: string;
 };
 
+//mapping property to property dto
 const TYPE_LABEL: Record<PropertyType, PropertyDTO["type"]> = {
   HOUSE: "House",
   VILLA: "Villa",
@@ -23,11 +24,13 @@ const TYPE_LABEL: Record<PropertyType, PropertyDTO["type"]> = {
   HOTEL: "Hotel",
 };
 
+//changing like 1000 to 1K --> cuz it's easy
 function compactKilo(n: number): string {
   if (n < 1000) return Math.round(n).toString();
   const k = n / 1000;
   return Number.isInteger(k) ? `${k}K` : `${k.toFixed(1)}K`;
 }
+
 
 export function minMonthlyPrice(
   roomTypes: Pick<PrismaRoomType, "pricePerMonth">[],
@@ -38,12 +41,15 @@ export function minMonthlyPrice(
   return prices.length ? Math.min(...prices) : null;
 }
 
+// take prisma property 
+//if have rooms convert this prisma property to property dto
+//otherwise iclude empty room []
 export function toPropertyDTO(
   p: PrismaProperty & { roomTypes?: PrismaRoomType[] },
   isFavorite = false,
 ): PropertyDTO {
+  // get all the room types and use them to calculate the lowest starting price
   const minPrice = minMonthlyPrice(p.roomTypes ?? []);
-
   return {
     id: p.id,
     title: p.title,
