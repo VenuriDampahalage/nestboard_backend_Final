@@ -35,4 +35,15 @@ bookingsRouter.post(
   ctrl.confirm,
 );
 
-bookingsRouter.get("/my", requireRole(Role.USER), ctrl.myBookings);
+bookingsRouter.get(
+  "/my", 
+  requireRole(Role.USER), 
+  ctrl.myBookings
+);
+
+//B1
+bookingsRouter.get(
+  "/admin",
+  requireRole(Role.ADMIN),
+  ctrl.vendorBookings,
+);
