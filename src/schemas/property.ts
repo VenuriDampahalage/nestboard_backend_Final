@@ -14,4 +14,10 @@ export const createPropertySchema = z
   })
   .strict();
 
+
+
+//export const createPropertWithVendor = createPropertySchema.extend({
+//  vendorId: z.uuid()
+//})
+
 export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
