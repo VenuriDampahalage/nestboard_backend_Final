@@ -39,3 +39,12 @@ export const myBookings: RequestHandler = async (req, res, next) => {
     next(err);
   }
 };
+
+//B1 --> handling admin booking list view
+export const vendorBookings: RequestHandler = async (req, res, next) => {
+  try {
+    res.json(await svc.listVendorBookings(req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+};

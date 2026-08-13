@@ -165,3 +165,49 @@ export async function listMyBookings(
     },
   });
 }
+
+//Admin booking endpoint - service
+export async function listVendorBookings(
+  vendorId: string,
+  db: PrismaClient = defaultPrisma,
+){
+  return db.booking.findMany({
+    where:{
+      room:{
+        roomType:{
+          property:{
+            vendorId,
+          }
+        }
+      }
+    },
+    orderBy:{ createdAt: 'desc' },
+    include:{
+      tenant:{
+        select:{
+          id: true,
+          displayName: true,
+          email: true,
+          avatarUrl: true,
+        }
+      },
+      room:{
+        include:{
+          roomType:{
+            include:{
+              property:{
+                select:{
+                  id:true,
+                  title:true,
+                }
+              }
+            }
+          }
+        }
+      }
+
+    }
+
+  });
+
+}

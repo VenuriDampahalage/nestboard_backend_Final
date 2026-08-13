@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+// ^ $ to make clear the ending and begining
 const monthIso = z.string().regex(/^\d{4}-\d{2}$/, "Expected YYYY-MM");
 
 export const createBookingSchema = z
