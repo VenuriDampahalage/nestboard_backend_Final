@@ -51,3 +51,6 @@ export function buildApp(): Express {
 
   return app;
 }
+
+const app = buildApp();
+export default app;
