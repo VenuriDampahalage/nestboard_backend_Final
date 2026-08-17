@@ -86,6 +86,7 @@ export function toPropertyDetailDTO(
   p: PrismaProperty & { roomTypes: PrismaRoomType[] },
   availableSeats: number,
   isFavorite = false,
+  computedRating?: number | null,
 ): PropertyDetailDTO {
   const minPrice = minMonthlyPrice(p.roomTypes);
 
@@ -97,7 +98,7 @@ export function toPropertyDetailDTO(
     address: p.address,
     city: p.city,
     type: p.type,
-    rating: p.rating.toString(),
+    rating: computedRating != null ? computedRating.toFixed(2) : p.rating.toString(),
     isFavorite,
     amenities: p.amenities,
     latitude: p.latitude,
