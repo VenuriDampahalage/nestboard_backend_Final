@@ -48,6 +48,7 @@ model User {
   refreshTokens RefreshToken[]
 
   favorites Favorite[]
+  reviews   Review[]
 
   @@map("users")
 }
@@ -86,6 +87,7 @@ model Property {
 
   vendor    User       @relation("VendorProperties", fields: [vendorId], references: [id], onDelete: Cascade)
   roomTypes RoomType[]
+  reviews   Review[]
 
   @@index([city])
   @@index([type])
@@ -137,8 +139,9 @@ model Booking {
   bookingStatus  BookingStatus @default(PENDING) @map("booking_status")
   createdAt      DateTime      @default(now()) @map("created_at")
 
-  tenant User @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  room   Room @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  tenant  User     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  room    Room     @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  reviews Review[]
 
   @@index([roomId, seatNumber, bookingStatus, leaseStart, leaseEnd])
   @@index([tenantId, createdAt(sort: Desc)])
@@ -146,14 +149,36 @@ model Booking {
 }
 
 model Favorite {
-  userId String @map("user_id") @db.Uuid
-  propertyId String @map("property_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
+  userId     String   @map("user_id") @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@id([userId, propertyId])
   @@index([propertyId])
   @@map("favorites")
+}
+
+model Review {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  bookingId  String   @map("booking_id") @db.Uuid
+  rating     Int
+  comment    String?  @db.Text
+  editCount  Int      @default(0) @map("edit_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  booking  Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId])
+  @@index([propertyId])
+  @@index([userId])
+  @@index([bookingId])
+  @@map("reviews")
 }
