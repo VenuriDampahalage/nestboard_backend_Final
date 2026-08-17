@@ -394,11 +394,19 @@ propertiesRouter.get("/:id", optionalAuth, async (req, res, next) => {
 
     const favorites = await favoritePropertyIds(req.user?.id, [property.id]);
 
+    const reviewAgg = await prisma.review.aggregate({
+      where: { propertyId: property.id },
+      _avg: { rating: true },
+      _count: { rating: true },
+    });
+    const computedRating = reviewAgg._count.rating > 0 ? reviewAgg._avg.rating : null;
+
     res.json(
       toPropertyDetailDTO(
         property,
         Math.max(totalSeats - bookedSeats, 0),
         favorites.has(property.id),
+        computedRating,
       ),
     );
   } catch (err) {
