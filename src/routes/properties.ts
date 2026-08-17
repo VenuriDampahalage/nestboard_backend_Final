@@ -7,7 +7,16 @@ import {
   toRoomTypeDTO,
 } from "../lib/dto.js";
 import { validateBody } from "../middleware/validate.js";
-import { createPropertySchema } from "../schemas/property.js";
+import { 
+  createPropertySchema,
+  updatePropertySchema,
+ } from "../schemas/property.js";
+ import {
+  createRoomTypeSchema,
+  updateRoomTypeSchema,
+  createRoomSchema,
+  updateRoomSchema,
+ } from "../schemas/room.js"
 import { Errors } from "../lib/errors.js";
 import { optionalAuth, requireRole, verifyJwt } from "../middleware/auth.js";
 import { Role } from "../generated/enums.js";
@@ -16,12 +25,27 @@ import { activeBookingWhere, leaseRange } from "../services/availability.js";
 
 export const propertiesRouter: Router = Router();
 
+//Reusable Owner-Check helper
+async function assertPropertyOwner(propertyId: string, vendorId: string) {
+  const property = await prisma.property.findUnique({
+    where: { id: propertyId },
+    select: { id: true, vendorId: true },
+  });
+  if (!property) throw Errors.notFound("Property");
+  if (property.vendorId !== vendorId) {
+    throw Errors.forbidden("You do not have permission to manage this property");
+  }
+  return property;
+}
+
+//imput --> number
 function parsePositiveInt(value: unknown, fallback: number): number {
   if (typeof value !== "string") return fallback;
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+//calculate page numbers for long lists
 function getPagination(query: Record<string, unknown>) {
   const page = parsePositiveInt(query.page, 1);
   const rawLimit = parsePositiveInt(query.limit, 10);
@@ -42,6 +66,7 @@ function availabilityWindow(query: Record<string, unknown>) {
   return { start: now, end: now };
 }
 
+//Counts --> seats thtat are currently taken in a list of rooms
 async function bookedSeatsByRoom(
   roomIds: string[],
   window: { start: Date; end: Date },
@@ -58,6 +83,7 @@ async function bookedSeatsByRoom(
   return new Map(grouped.map((g) => [g.roomId, g._count._all]));
 }
 
+//which properties in a list have been favorited by the logged in user
 async function favoritePropertyIds(
   userId: string | undefined,
   propertyIds: string[],
@@ -72,6 +98,7 @@ async function favoritePropertyIds(
 
 const PROPERTY_TYPES = ["HOUSE", "VILLA", "APARTMENT", "HOTEL"] as const;
 
+//input --> valid decimal number
 function parseDecimal(value: unknown): number | undefined {
   if (typeof value !== "string") return undefined;
   const parsed = Number.parseFloat(value);
@@ -161,6 +188,9 @@ function propertyFilters(
   return where;
 }
 
+// API ENDpoints -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+//GET all properties
 propertiesRouter.get("/", optionalAuth, async (req, res, next) => {
   try {
     const { page, limit, skip, take } = getPagination(req.query);
@@ -199,6 +229,7 @@ propertiesRouter.get("/", optionalAuth, async (req, res, next) => {
   }
 });
 
+//GET admin owned all properties
 propertiesRouter.get(
   "/mine",
   verifyJwt,
@@ -255,6 +286,7 @@ function haversineKm(
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+//Get properties for map view
 // Optional query params:
 //   ?minLat&maxLat&minLng&maxLng   bounding box filter
 //   ?lat&lng&radiusKm              radius filter, nearest first, each with distanceKm
@@ -305,6 +337,7 @@ propertiesRouter.get("/map-list", async (req, res, next) => {
   }
 });
 
+// Get tenant favorites
 // both spellings are in use by clients
 propertiesRouter.get(
   ["/my-favourites", "/my-favorites"],
@@ -334,6 +367,7 @@ propertiesRouter.get(
   },
 );
 
+//make fav or unfav
 propertiesRouter.patch(
   "/:id/toggle-favorite",
   verifyJwt,
@@ -371,6 +405,7 @@ propertiesRouter.patch(
   },
 );
 
+//GET single property detail
 propertiesRouter.get("/:id", optionalAuth, async (req, res, next) => {
   try {
     const property = await prisma.property.findUnique({
@@ -406,6 +441,7 @@ propertiesRouter.get("/:id", optionalAuth, async (req, res, next) => {
   }
 });
 
+//admin post end point
 propertiesRouter.post(
   "/",
   verifyJwt,
@@ -428,15 +464,53 @@ propertiesRouter.post(
   },
 );
 
+//admin edit endpont --> B2
+propertiesRouter.patch(
+  "/:id",
+  verifyJwt,
+  requireRole(Role.ADMIN),
+  validateBody(updatePropertySchema),
+  async (req, res, next) => {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        throw Errors.unauthenticated();
+      }
+
+       await assertPropertyOwner(String(req.params.id), userId);
+
+      const updatedProperty = await prisma.property.update({
+        where: {
+          id: String(req.params.id),
+        },
+        data: req.body,
+      });
+
+      res.json(updatedProperty);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+
+//admin delete endpoint
 propertiesRouter.delete(
   "/:id",
   verifyJwt,
   requireRole(Role.ADMIN),
   async (req, res, next) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) throw Errors.unauthenticated();
+      const propertyId = String(req.params.id);
+
+      await assertPropertyOwner(propertyId, userId);
+
       await prisma.property.delete({
         where: {
-          id: String(req.params.id),
+          id: propertyId,
         },
       });
       res.status(204).send();
@@ -446,6 +520,7 @@ propertiesRouter.delete(
   },
 );
 
+//GET all room types
 propertiesRouter.get("/:id/room-types", async (req, res, next) => {
   try {
     const property = await prisma.property.findUnique({
@@ -479,6 +554,7 @@ propertiesRouter.get("/:id/room-types", async (req, res, next) => {
   }
 });
 
+//GET room types by id
 propertiesRouter.get("/:id/room-types/:roomTypeId", async (req, res, next) => {
   try {
     const window = availabilityWindow(req.query);
@@ -534,3 +610,208 @@ propertiesRouter.get("/:id/room-types/:roomTypeId", async (req, res, next) => {
     next(err);
   }
 });
+
+// CREATE room type
+propertiesRouter.post(
+  "/:id/room-types",
+  verifyJwt,
+  requireRole(Role.ADMIN),
+  validateBody(createRoomTypeSchema),
+  async (req, res, next) => { 
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        throw Errors.unauthenticated();
+      }
+
+      // Check that this property belongs to the logged-in admin
+      await assertPropertyOwner(String(req.params.id), userId);
+
+      const roomType = await prisma.roomType.create({
+        data: {
+          ...req.body,
+          propertyId: String(req.params.id),
+        },
+      });
+
+      res.status(201).json(roomType);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+//Edit room Type 
+propertiesRouter.patch(
+  "/:id/room-types/:roomTypeId",
+  verifyJwt,
+  requireRole(Role.ADMIN),
+  validateBody(updateRoomTypeSchema),
+  async (req, res, next) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw Errors.unauthenticated();
+      const propertyId = String(req.params.id);
+      const roomTypeId = String(req.params.roomTypeId);
+
+      await assertPropertyOwner(propertyId, userId);
+
+      const existing = await prisma.roomType.findFirst({
+        where: { id: roomTypeId, propertyId },
+      });
+      if (!existing) throw Errors.notFound("Room type");
+
+      const roomType = await prisma.roomType.update({
+        where: { id: roomTypeId },
+        data: req.body,
+      });
+
+      res.json(roomType);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+//Delete room Type
+propertiesRouter.delete(
+  "/:id/room-types/:roomTypeId",
+  verifyJwt,
+  requireRole(Role.ADMIN),
+  async (req, res, next) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw Errors.unauthenticated();
+      const propertyId = String(req.params.id);
+      const roomTypeId = String(req.params.roomTypeId);
+
+      await assertPropertyOwner(propertyId, userId);
+
+      const existing = await prisma.roomType.findFirst({
+        where: { id: roomTypeId, propertyId },
+      });
+      if (!existing) throw Errors.notFound("Room type");
+
+      await prisma.roomType.delete({
+        where: { id: roomTypeId },
+      });
+
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// CREATE room under a room type
+propertiesRouter.post(
+  "/:id/room-types/:roomTypeId/rooms",
+  verifyJwt,
+  requireRole(Role.ADMIN),
+  validateBody(createRoomSchema),
+  async (req, res, next) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw Errors.unauthenticated();
+
+      const propertyId = String(req.params.id);
+      const roomTypeId = String(req.params.roomTypeId);
+
+      await assertPropertyOwner(propertyId, userId);
+
+      const roomType = await prisma.roomType.findFirst({
+        where: { id: roomTypeId, propertyId },
+      });
+      if (!roomType) throw Errors.notFound("Room type");
+
+      const room = await prisma.room.create({
+        data: {
+          ...req.body,
+          roomTypeId,
+        },
+      });
+
+      res.status(201).json(room);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Edit room under a room type
+propertiesRouter.patch(
+  "/:id/room-types/:roomTypeId/rooms/:roomId",
+  verifyJwt,
+  requireRole(Role.ADMIN),
+  validateBody(updateRoomSchema),
+  async (req, res, next) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw Errors.unauthenticated();
+
+      const propertyId = String(req.params.id);
+      const roomTypeId = String(req.params.roomTypeId);
+      const roomId = String(req.params.roomId);
+
+      await assertPropertyOwner(propertyId, userId);
+
+      const roomType = await prisma.roomType.findFirst({
+        where: { id: roomTypeId, propertyId },
+      });
+      if (!roomType) throw Errors.notFound("Room type");
+
+      const existingRoom = await prisma.room.findFirst({
+        where: { id: roomId, roomTypeId },
+      });
+      if (!existingRoom) throw Errors.notFound("Room");
+
+      const updatedRoom = await prisma.room.update({
+        where: { id: roomId },
+        data: req.body,
+      });
+
+      res.json(updatedRoom);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Delete room under a room type
+propertiesRouter.delete(
+  "/:id/room-types/:roomTypeId/rooms/:roomId",
+  verifyJwt,
+  requireRole(Role.ADMIN),
+  async (req, res, next) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw Errors.unauthenticated();
+
+      const propertyId = String(req.params.id);
+      const roomTypeId = String(req.params.roomTypeId);
+      const roomId = String(req.params.roomId);
+
+      await assertPropertyOwner(propertyId, userId);
+
+      const roomType = await prisma.roomType.findFirst({
+        where: { id: roomTypeId, propertyId },
+      });
+      if (!roomType) throw Errors.notFound("Room type");
+
+      const existingRoom = await prisma.room.findFirst({
+        where: { id: roomId, roomTypeId },
+      });
+      if (!existingRoom) throw Errors.notFound("Room");
+
+      await prisma.room.delete({
+        where: { id: roomId },
+      });
+
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
