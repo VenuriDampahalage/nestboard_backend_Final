@@ -26,3 +26,14 @@ export const loginSchema = z
   .strict();
 
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const updateProfileSchema = z
+  .object({
+    displayName: z.string().min(2).max(100).optional(),
+    profileImage: z.string().optional(),
+    avatarUrl: z.string().optional(),
+  })
+  .strict();
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
