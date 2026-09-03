@@ -50,3 +50,8 @@ The `server` / `app` split exists so tests can import the app factory without bi
 ## For students
 
 The README is the orientation map; the take-home notes PDF (per session) is the textbook; the commit history is the journal of how we got here. If anything in the code doesn't match what we did in class, the take-home notes for that session are the source of truth. Open an issue and I'll fix the code.
+
+## Submission Links
+Backend: https://nestboard-backend-final.vercel.app/
+Frontend: https://nestboard-frontend-final.vercel.app/
+Mobileapp:
