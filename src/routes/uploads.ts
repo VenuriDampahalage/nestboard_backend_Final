@@ -21,12 +21,12 @@ if (!useR2) {
 const storage = useR2
   ? multer.memoryStorage()
   : multer.diskStorage({
-      destination: (_req, _file, cb) => cb(null, env.UPLOAD_LOCAL_DIR),
-      filename: (_req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase();
-        cb(null, `${randomUUID()}${ext}`);
-      },
-    });
+    destination: (_req, _file, cb) => cb(null, env.UPLOAD_LOCAL_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${randomUUID()}${ext}`);
+    },
+  });
 
 const upload = multer({
   storage,
