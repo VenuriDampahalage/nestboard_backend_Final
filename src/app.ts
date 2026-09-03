@@ -23,7 +23,7 @@ export function buildApp(): Express {
   app.use(pinoHttp({ logger }));
 
   app.use(helmet());
-  app.use(cors({ origin: corsOrigins, credentials: false }));
+  app.use(cors({ origin: corsOrigins, credentials: true }));
   app.use(express.json({ limit: "1mb" }));
 
   const apiLimiter = rateLimit({
